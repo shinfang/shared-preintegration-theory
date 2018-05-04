@@ -24,7 +24,7 @@ class IMUFunctor_Bias{
 	bool operator() (const T* const attitude_i_hat, const T* const attitude_i_1_hat,
 					const T* const velocity_i_hat, const T* const velocity_i_1_hat,
 					const T* const position_i_hat, const T* const position_i_1_hat,
-					const T* const bias_hat_gyro,
+					//const T* const bias_hat_gyro,
 					T* residual)const{
 
 	/*	bool operator() (const T* const attitude_i_hat, const T* const attitude_i_1_hat,
@@ -34,8 +34,13 @@ class IMUFunctor_Bias{
 
 		int c = 0;
 		int index_preint = 1;
-		double dt = 0.005;
-		double dtij = dt * 4;
+	// **** euroc parameter
+	/*	double dt = 0.005;
+		double dtij = dt * 4;  */
+
+	// **** ardu parameter
+			double dt = 0.02;
+			double dtij = dt * 10;
 
 		Eigen::Matrix<T,3,1> gravity_vector;
 		gravity_vector << T(0.0),T(0.0),T(9.8);
@@ -54,12 +59,15 @@ class IMUFunctor_Bias{
 		std::map<int,Eigen::Matrix<T,3,1> > Preintegrated_velocity;
 		std::map<int, Eigen::Matrix<T,3,1> > Preintegrated_position;
 
-		Eigen::Map<const Eigen::Matrix<T,3,1> > bias_hat_gyro_(bias_hat_gyro);
+		//Eigen::Map<const Eigen::Matrix<T,3,1> > bias_hat_gyro_(bias_hat_gyro);
 		//Eigen::Map<const Eigen::Matrix<T,3,1> > bias_hat_acc_(bias_hat_acc);
 
 		Eigen::Matrix<T,3,3> delta_Rij = Eigen::Matrix<T,3,3>::Identity();
 		Eigen::Matrix<T,3,1> delta_Rik = Eigen::Matrix<T,3,1>::Zero();
 		Eigen::Matrix<T,3,1> relative_p = Eigen::Matrix<T,3,1>::Zero();
+
+		Eigen::Matrix<T,3,1> bias_g_constant;
+		bias_g_constant << T(-0.0022), T(0.0207), T(0.0764);
 
 
 //Recompute preintegrated omega with optimized bias
@@ -75,7 +83,7 @@ for (VectorOfConstraints::const_iterator constraints_iter = omega_vector.begin()
 	Eigen::Matrix<T,3,1> accCorrect = gyro.acceleration.template cast<T>() ;//- bias_hat_acc_ ;
 	//	std::cout<<"ACCELEROMETER MEASUREMENT" << accCorrect<<std::endl;
 
-	Eigen::Matrix<T,3,1> gyroCorrect =  ( gyro.ang_velocity.template cast<T>() - bias_hat_gyro_) * dt;
+	Eigen::Matrix<T,3,1> gyroCorrect =  ( gyro.ang_velocity.template cast<T>() ) * dt ;//- bias_hat_gyro_) * dt;
 	//std::cout<<"Prior to correction"<<gyro.ang_velocity.template cast<T>()<<std::endl;
 	//std::cout<<"Corrected gyro measurement"<<gyroCorrect<<std::endl;
 
@@ -121,7 +129,7 @@ for (VectorOfConstraints::const_iterator constraints_iter = omega_vector.begin()
 				//std::cout<<"delta Rij"<<delta_Rij<<std::endl;
 				//std::cout<<"Next delta"<<std::endl;
 
-		if (c % 4 == 0)
+		if (c % 10 == 0)
 		{
 				//std::cout<<"Enter loop c = 4"<<delta_Rij<<std::endl;
 				//std::cout<<"delta Rik"<<delta_Rik<<std::endl;
@@ -205,15 +213,15 @@ for (VectorOfConstraints::const_iterator constraints_iter = omega_vector.begin()
 
 // ------- Compute residuals ( p, v, q )
 			Eigen::Map<Eigen::Matrix<T,9,1> > residuals(residual);
-			residuals.template block<3,1>(0,0) = T(8.0) *(p_ij_estimated  - preintegrated_pos_ij);
-			residuals.template block<3,1>(3,0) = T(8.0) *(v_ij_estimated - preintegrated_vel_ij);
-			residuals.template block<3,1>(6,0) = T(1.0) * delta_q.vec();
+			residuals.template block<3,1>(0,0) = T(1.0) *(p_ij_estimated  - preintegrated_pos_ij);
+			residuals.template block<3,1>(3,0) = T(1.0) *(v_ij_estimated - preintegrated_vel_ij);
+			residuals.template block<3,1>(6,0) = T(4.0) * delta_q.vec();
 
 
 		return true;
 	}
 	static ceres::CostFunction* Create(const VectorOfConstraints& a, int index){
-			return new ceres::AutoDiffCostFunction<IMUFunctor_Bias,9,4,4,3,3,3,3,3>(
+			return new ceres::AutoDiffCostFunction<IMUFunctor_Bias,9,4,4,3,3,3,3>(
 					new IMUFunctor_Bias(a,index));
 		}
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -245,7 +253,7 @@ class AttitudeError_x{
     	  Eigen::Matrix<T,3,1> p_x_world;
     	  //p_x_world << T(0.0897),T(0.4),T(-0.9121);
 
-    	  p_x_world << T(1),T(0),T(0);
+    	  p_x_world << T(0.628542018570737),T(0.120501509513427),T(-0.768384224913558);
 
     	  Eigen::Map<const Eigen::Quaternion<T> > pose_hat(robot_pose_estimated);
     	  Eigen::Quaternion<T> vec_b_constant = vec_b_x_.template cast<T>();
@@ -351,7 +359,7 @@ class VelocityError{
 
 		//std::cout<<"velocity measurement in the cost function"<<Vm<<std::endl;
 
-		residuals = T(1.0) * (Vm - velocity_hat_);
+		residuals = T(5.0) * (Vm - velocity_hat_);
 		return true;
 
 	}
@@ -378,7 +386,7 @@ class PositionError{
 
 		//std::cout<< "position measurement in the cost function"<<Pm<<std::endl;
 
-		residuals = T(1.0)*(Pm - position_hat_);
+		residuals = T(5.0)*(Pm - position_hat_);
 		return true;
 	}
 
@@ -406,7 +414,7 @@ class Bias_Gyro{
 		Eigen::Map<Eigen::Matrix<T,3,1> > residuals(residual);
 
 
-		residuals = T(30.0)* (bias_G_hat_i_- bias_G_hat_j_);
+		residuals = T(1.0)* (bias_G_hat_i_- bias_G_hat_j_);
 
 		return true;
 	}

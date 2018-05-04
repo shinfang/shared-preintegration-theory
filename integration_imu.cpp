@@ -25,7 +25,8 @@
 #include "pose_error.h"
 #include "integration_imu.hpp"
 
-DEFINE_string(input,"/Users/shinfang/Documents/MATLAB/Simulation/EUROC_data.txt","The file is similar to g2o format");
+//DEFINE_string(input,"/Users/shinfang/Documents/MATLAB/Simulation/EUROC_data.txt","The file is similar to g2o format");
+DEFINE_string(input,"/Users/shinfang/Documents/MATLAB/Simulation/EuRoC_evaluation/Ardupilot/Ardupilot_data.txt","The file is similar to g2o format");
 
 //preintegration_func IMU_Integration;
 namespace ceres{
@@ -114,6 +115,7 @@ int main(int argc, char** argv)
  for (std::map<int,Pose3d, std::less<int>, Eigen::aligned_allocator<std::pair<const int,Pose3d> > >::const_iterator attitude_iterator= poses.begin();attitude_iterator!=poses.end();++attitude_iterator)
  {
 
+
 	const std::map<int,Pose3d, std::less<int>,Eigen::aligned_allocator<std::pair<const int,Pose3d> > >::value_type pair = *attitude_iterator;
     	MapOfPoses::iterator current_pose_to_optimize = poses.find(pointer_index);
 
@@ -140,7 +142,7 @@ int main(int argc, char** argv)
     	//std::cout<<"measured position"<<measured_position<<std::endl;
 
     	ceres::CostFunction* cost_function_x = ceres::examples::AttitudeError_x::Create(vector_b_x,pointer_index);
-    	ceres::CostFunction* cost_function_y = ceres::examples::AttitudeError_y::Create(vector_b_y);
+    	// ceres::CostFunction* cost_function_y = ceres::examples::AttitudeError_y::Create(vector_b_y);
 
 	ceres::CostFunction* cost_function_vel = ceres::examples::VelocityError::Create(measured_linear_velocity);
     	ceres::CostFunction* cost_function_position = ceres::examples::PositionError::Create(measured_position);
@@ -150,8 +152,8 @@ int main(int argc, char** argv)
     		///ceres::CostFunction* cost_function_bias = ceres::examples::Bias::Create(bias_vec);
 
 
-    	problem.AddResidualBlock(cost_function_x,loss_function,current_pose_to_optimize->second.q.coeffs().data());
-    problem.AddResidualBlock(cost_function_y,loss_function,current_pose_to_optimize->second.q.coeffs().data());
+    problem.AddResidualBlock(cost_function_x,loss_function,current_pose_to_optimize->second.q.coeffs().data());
+    //problem.AddResidualBlock(cost_function_y,loss_function,current_pose_to_optimize->second.q.coeffs().data());
 
     problem.AddResidualBlock(cost_function_vel,loss_function,current_pose_to_optimize->second.v.data());
     	problem.AddResidualBlock(cost_function_position, loss_function,current_pose_to_optimize->second.p.data());
@@ -168,12 +170,19 @@ int main(int argc, char** argv)
 
     		ceres::CostFunction* imu_cost_function = ceres::examples::IMUFunctor_Bias::Create(constraints,pointer_index);
 
-    		 //	disable estimate for bias accelerometer
+    		// disable estimate for bias gyro
 
     		problem.AddResidualBlock(imu_cost_function, loss_function, prev_pose_to_optimize->second.q.coeffs().data(),current_pose_to_optimize->second.q.coeffs().data(),
+    		    								prev_pose_to_optimize->second.v.data(), current_pose_to_optimize->second.v.data(),
+    										prev_pose_to_optimize->second.p.data(), current_pose_to_optimize->second.p.data());
+
+
+    		 //	disable estimate for bias accelerometer
+
+    	/*	problem.AddResidualBlock(imu_cost_function, loss_function, prev_pose_to_optimize->second.q.coeffs().data(),current_pose_to_optimize->second.q.coeffs().data(),
     								prev_pose_to_optimize->second.v.data(), current_pose_to_optimize->second.v.data(),
 								prev_pose_to_optimize->second.p.data(), current_pose_to_optimize->second.p.data(),
-								prev_pose_to_optimize->second.bias_G.data());
+								prev_pose_to_optimize->second.bias_G.data());   */
 
 
     // ----- uncomment to enable estimate for bias accelerometer
@@ -191,8 +200,8 @@ int main(int argc, char** argv)
 
     		// ------ cost function for bias
 
-    			ceres::CostFunction* cost_function_bias_gyro = ceres::examples::Bias_Gyro::Create(bias_vec);
-    			problem.AddResidualBlock(cost_function_bias_gyro, loss_function, prev_pose_to_optimize->second.bias_G.data(),current_pose_to_optimize->second.bias_G.data());
+    			//ceres::CostFunction* cost_function_bias_gyro = ceres::examples::Bias_Gyro::Create(bias_vec);
+    			//problem.AddResidualBlock(cost_function_bias_gyro, loss_function, prev_pose_to_optimize->second.bias_G.data(),current_pose_to_optimize->second.bias_G.data());
     																			//prev_pose_to_optimize->second.bias_A.data(), current_pose_to_optimize->second.bias_A.data());
 
 
@@ -235,7 +244,7 @@ int main(int argc, char** argv)
 
  	 std::cout<<summary.FullReport()<<std::endl;
 	 //ceres::examples::BuildOptimizationProblem_Main(Preintegrated_Map,&poses);
- 	 ceres::examples::OutputPoses("/Users/shinfang/Documents/MATLAB/Simulation/EUROC_optimized.txt",&poses);
+ 	 ceres::examples::OutputPoses("/Users/shinfang/Documents/MATLAB/Simulation/EuRoC_evaluation/Ardupilot/Ardupilot_Optimised.txt",&poses);
 
  	 std::fstream outfile;
  	 outfile.open("poses_print_here",std::istream::out);
